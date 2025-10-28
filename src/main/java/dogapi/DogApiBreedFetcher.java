@@ -67,7 +67,6 @@ public class DogApiBreedFetcher implements BreedFetcher {
                 throw new BreedNotFoundException("HTTP " + code + ": " + msg);
             }
         }catch (IOException | JSONException e) {
-            // 统一映射网络/IO错误
             throw new BreedNotFoundException(breed);
         }
     }
