@@ -3,7 +3,9 @@ package dogapi;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
@@ -25,11 +27,47 @@ public class DogApiBreedFetcher implements BreedFetcher {
      */
     @Override
     public List<String> getSubBreeds(String breed) {
-        // TODO Task 1: Complete this method based on its provided documentation
-        //      and the documentation for the dog.ceo API. You may find it helpful
-        //      to refer to the examples of using OkHttpClient from the last lab,
-        //      as well as the code for parsing JSON responses.
-        // return statement included so that the starter code can compile and run.
-        return new ArrayList<>();
+        if (breed == null || breed.trim().isEmpty()) {
+            throw new BreedNotFoundException("breed is null or blank");
+        }
+
+        String normalized = breed.trim().toLowerCase(Locale.ROOT);
+        String url = "https://dog.ceo/api/breed/" + normalized + "/list";
+        Request request = new Request.Builder().url(url).build();
+
+        try (Response response = client.newCall(request).execute()){
+            ResponseBody responseBody = response.body();
+            int httpCode = response.code();
+            if (responseBody == null) {
+                throw new BreedNotFoundException(breed);
+            }
+
+            String response_string = responseBody.string();
+            JSONObject responseJson = new JSONObject(response_string);
+            String status = responseJson.optString("status", "");
+
+            if ("success".equalsIgnoreCase(status)) {
+                JSONArray message =  responseJson.optJSONArray("message");
+                if (message == null) {
+                    throw new BreedNotFoundException(breed);
+                }
+                List<String> breeds = new ArrayList<>(message.length());
+                for (int i = 0; i < message.length(); i++) {
+                    breeds.add(message.optString(i, ""));
+                }
+                return breeds;
+            }
+            else {
+                String msg = responseJson.optString("message", "");
+                int code = responseJson.optInt("code", httpCode);
+                boolean notFound = code == 404 || msg.toLowerCase(Locale.ROOT).contains("breed not found");
+                if (notFound) {
+                    throw new BreedNotFoundException(msg);
+                }
+                throw new BreedNotFoundException("HTTP " + code + ": " + msg);
+            }
+        }catch (IOException | JSONException e) {
+            throw new BreedNotFoundException(breed);
+        }
     }
 }
